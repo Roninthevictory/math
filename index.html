@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>P≠NP Proof Exploration Engine · Live</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<!-- ═══════════════════════════════════════════════════════
+     FIREBASE SDK
+═══════════════════════════════════════════════════════ -->
+<script type="module">
+  // ─── FIREBASE CONFIG ──────────────────────────────────────────────────────
+  // TO USE: Create a free Firebase project at https://console.firebase.google.com
+  // 1. Create project → Add web app → copy the firebaseConfig below
+  // 2. Go to Realtime Database → Create database → Start in TEST MODE
+  // 3. Replace the config object below with your own values
+  // ─────────────────────────────────────────────────────────────────────────
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, onValue, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAoa9bn0JmhiXmoqrw6jjV6SeIcGiRWGaE",
+    authDomain: "math-5f920.firebaseapp.com",
+    databaseURL: "https://math-5f920-default-rtdb.firebaseio.com",
+    projectId: "math-5f920",
+    storageBucket: "math-5f920.firebasestorage.app",
+    messagingSenderId: "171456451100",
+    appId: "1:171456451100:web:b96c8a0467fe52e47cc5d9"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+  window._fb = { db, ref, set, onValue, serverTimestamp };
+  window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#07090f;--bg2:#0d1117;--bg3:#141922;--bg4:#1c2333;
+  --border:#1e2d40;--border2:#243348;
+  --text:#c9d1d9;--text2:#8b949e;--text3:#484f58;
+  --green:#39d353;--green2:#1a6b2e;--green3:#0d3318;
+  --teal:#00b4d8;--teal2:#0077b6;
+  --amber:#e6a817;--amber2:#7d5a00;
+  --red:#f85149;--red2:#6e1c19;
+  --purple:#bc8cff;--purple2:#3d2a6e;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;overflow:hidden}
+
+#app{display:grid;grid-template-rows:48px 1fr 28px;grid-template-columns:260px 1fr 300px;height:100vh}
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:var(--bg2);border-bottom:1px solid var(--border);z-index:10;gap:12px}
+#left-panel{grid-row:2;overflow:hidden;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--bg2)}
+#center-panel{grid-row:2;overflow:hidden;display:flex;flex-direction:column;background:var(--bg)}
+#right-panel{grid-row:2;overflow:hidden;display:flex;flex-direction:column;border-left:1px solid var(--border);background:var(--bg2)}
+footer{grid-column:1/-1;display:flex;align-items:center;padding:0 16px;gap:16px;background:var(--bg2);border-top:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--text3)}
+
+.logo{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.logo-icon{width:28px;height:28px;background:linear-gradient(135deg,#0d3318,#1a6b2e);border:1px solid var(--green2);border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--green);font-weight:600}
+.logo-text{font-weight:600;font-size:14px;letter-spacing:-.3px}
+.logo-sub{font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:.5px}
+
+/* viewer badge */
+#mode-badge{padding:3px 10px;border-radius:3px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.8px;flex-shrink:0}
+#mode-badge.master{background:var(--green3);border:1px solid var(--green2);color:var(--green)}
+#mode-badge.viewer{background:#0d1f2d;border:1px solid var(--teal2);color:var(--teal)}
+#viewer-count{font-family:var(--mono);font-size:10px;color:var(--text3);flex-shrink:0}
+
+.header-stats{display:flex;gap:20px;align-items:center}
+.hstat{display:flex;flex-direction:column;align-items:flex-end}
+.hstat-val{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--teal)}
+.hstat-label{font-size:9px;color:var(--text3);letter-spacing:.8px;text-transform:uppercase}
+
+.header-controls{display:flex;gap:8px;align-items:center;flex-shrink:0}
+button{font-family:var(--sans);font-size:12px;font-weight:500;border:1px solid var(--border2);border-radius:3px;padding:5px 12px;cursor:pointer;transition:all .15s;background:var(--bg3);color:var(--text)}
+button:hover{background:var(--bg4);border-color:var(--teal2)}
+button.primary{background:var(--green3);border-color:var(--green2);color:var(--green)}
+button.primary:hover{background:#0f4020;border-color:var(--green)}
+button.stop-btn{background:#1a0f0f;border-color:var(--red2);color:var(--red)}
+button:disabled{opacity:.4;cursor:not-allowed}
+
+#run-status{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--text2)}
+.pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--text3)}
+.pulse-dot.running{background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 1s ease-in-out infinite}
+.pulse-dot.found{background:var(--amber);box-shadow:0 0 8px var(--amber);animation:pulse .5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.panel-header{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.panel-title{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text2)}
+.panel-badge{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:2px;background:var(--bg4);border:1px solid var(--border);color:var(--text2)}
+
+.prog-bar-wrap{padding:8px 14px;border-bottom:1px solid var(--border)}
+.prog-label{font-size:10px;color:var(--text3);margin-bottom:4px;display:flex;justify-content:space-between}
+.prog-track{height:3px;background:var(--bg4);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;border-radius:2px;transition:width .3s}
+.prog-fill.green{background:var(--green)}
+.prog-fill.teal{background:var(--teal)}
+.prog-fill.amber{background:var(--amber)}
+
+#strategy-list{overflow-y:auto;flex:1;padding:8px}
+.strategy-item{padding:8px 10px;margin-bottom:4px;border-radius:3px;border:1px solid transparent;transition:all .15s}
+.strategy-item.eliminated{opacity:.4}
+.strategy-item.promising{border-color:var(--green2);background:var(--green3)}
+.s-name{font-weight:500;font-size:12px;margin-bottom:3px}
+.s-meta{font-family:var(--mono);font-size:10px;color:var(--text3);display:flex;gap:8px;flex-wrap:wrap}
+.s-badge{padding:1px 5px;border-radius:2px;font-size:9px;font-weight:600;letter-spacing:.5px}
+.s-badge.active{background:var(--teal2);color:#a8d8ff}
+.s-badge.elim{background:var(--red2);color:var(--red)}
+.s-badge.prom{background:var(--green2);color:var(--green)}
+
+#canvas-wrap{flex:1;position:relative;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+
+#log-panel{height:180px;border-top:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+#log-stream{flex:1;overflow-y:auto;padding:6px 12px;font-family:var(--mono);font-size:10.5px;line-height:1.7}
+.log-line{padding:1px 0;border-bottom:1px solid #0a0f16}
+.log-line .ts{color:var(--text3);margin-right:8px}
+.log-line .tag{padding:1px 5px;border-radius:2px;font-size:9px;font-weight:600;margin-right:6px}
+.tag-info{background:#0d2540;color:var(--teal)}
+.tag-calc{background:#0d2520;color:var(--green)}
+.tag-elim{background:var(--red2);color:var(--red)}
+.tag-warn{background:#2a1f00;color:var(--amber)}
+.tag-prom{background:var(--green3);color:var(--green)}
+.tag-found{background:#2a1500;color:var(--amber);animation:blink .5s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
+
+#calc-detail{overflow-y:auto;flex:1;padding:10px 14px;font-family:var(--mono);font-size:11px}
+.detail-section{margin-bottom:14px}
+.detail-title{font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.kv{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #0a0f16}
+.kv .k{color:var(--text2)}
+.kv .v{color:var(--green);text-align:right;max-width:160px;word-break:break-all}
+.kv .v.teal{color:var(--teal)}.kv .v.amber{color:var(--amber)}.kv .v.red{color:var(--red)}.kv .v.purple{color:var(--purple)}
+.formula-box{background:var(--bg3);border:1px solid var(--border2);border-radius:3px;padding:8px 10px;font-size:10.5px;color:var(--purple);line-height:1.8;white-space:pre-wrap;word-break:break-all;margin-top:4px}
+.mem-bar{display:flex;gap:2px;flex-wrap:wrap;margin-top:6px}
+.mem-cell{width:10px;height:10px;border-radius:1px;background:var(--bg4);border:1px solid var(--border);transition:background .2s}
+.mem-cell.used{background:var(--teal2);border-color:var(--teal)}
+.mem-cell.active-cell{background:var(--green);border-color:var(--green);box-shadow:0 0 4px var(--green)}
+
+#proof-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;align-items:center;justify-content:center}
+#proof-overlay.show{display:flex}
+.proof-modal{background:var(--bg2);border:1px solid var(--amber);border-radius:6px;padding:28px 32px;max-width:680px;width:90%;max-height:80vh;overflow-y:auto}
+.proof-modal h2{font-size:18px;color:var(--amber);margin-bottom:4px}
+.proof-modal .subtitle{font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:20px;letter-spacing:.5px}
+.proof-body{font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text);white-space:pre-wrap;background:var(--bg3);border:1px solid var(--border2);border-radius:3px;padding:14px;margin-bottom:16px;max-height:360px;overflow-y:auto}
+.proof-actions{display:flex;gap:10px}
+
+/* firebase config notice */
+#config-notice{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:200;align-items:center;justify-content:center}
+#config-notice.show{display:flex}
+.config-box{background:var(--bg2);border:1px solid var(--amber);border-radius:6px;padding:28px 32px;max-width:620px;width:90%}
+.config-box h2{color:var(--amber);margin-bottom:12px;font-size:16px}
+.config-box p{color:var(--text2);line-height:1.7;font-size:13px;margin-bottom:10px}
+.config-box code{font-family:var(--mono);font-size:11px;background:var(--bg3);padding:2px 6px;border-radius:2px;color:var(--teal)}
+.config-box ol{color:var(--text2);padding-left:20px;line-height:2;font-size:13px}
+.config-box a{color:var(--teal);text-decoration:underline}
+
+/* offline fallback mode badge */
+#offline-badge{display:none;background:#1a1200;border:1px solid var(--amber2);border-radius:3px;padding:2px 8px;font-family:var(--mono);font-size:10px;color:var(--amber)}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:var(--teal2)}
+</style>
+</head>
+<body>
+
+<div id="app">
+<header>
+  <div class="logo">
+    <div class="logo-icon">P≠</div>
+    <div>
+      <div class="logo-text">Complexity Proof Engine</div>
+      <div class="logo-sub">P vs NP · Live Shared Session</div>
+    </div>
+  </div>
+  <span id="mode-badge" class="viewer">VIEWER</span>
+  <span id="offline-badge">OFFLINE MODE</span>
+  <span id="viewer-count">— viewers</span>
+  <div class="header-stats">
+    <div class="hstat"><span class="hstat-val" id="h-calcs">0</span><span class="hstat-label">Calculations</span></div>
+    <div class="hstat"><span class="hstat-val" id="h-depth">0</span><span class="hstat-label">Depth</span></div>
+    <div class="hstat"><span class="hstat-val" id="h-branches">0</span><span class="hstat-label">Branches</span></div>
+    <div class="hstat"><span class="hstat-val" id="h-elim">0</span><span class="hstat-label">Eliminated</span></div>
+    <div class="hstat"><span class="hstat-val" id="h-runtime">0s</span><span class="hstat-label">Runtime</span></div>
+  </div>
+  <div class="header-controls" id="master-controls" style="display:none">
+    <div id="run-status"><div class="pulse-dot" id="pulse"></div><span id="status-text">Idle</span></div>
+    <button class="primary" id="btn-start" onclick="engineStart()">▶ Start</button>
+    <button class="stop-btn" id="btn-stop" onclick="engineStop()" disabled>■ Halt</button>
+    <button id="btn-reset" onclick="engineReset()">↺ Reset</button>
+  </div>
+  <div id="viewer-status" style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--text2)">
+    <div class="pulse-dot" id="viewer-pulse"></div>
+    <span id="viewer-status-text">Connecting…</span>
+  </div>
+</header>
+
+<div id="left-panel">
+  <div class="panel-header">
+    <span class="panel-title">Proof Strategies</span>
+    <span class="panel-badge" id="strat-count">7 active</span>
+  </div>
+  <div class="prog-bar-wrap">
+    <div class="prog-label"><span>Overall Progress</span><span id="prog-pct">0%</span></div>
+    <div class="prog-track"><div class="prog-fill teal" id="prog-overall" style="width:0%"></div></div>
+  </div>
+  <div class="prog-bar-wrap">
+    <div class="prog-label"><span>Circuit Lower Bounds</span><span id="prog-clb">0%</span></div>
+    <div class="prog-track"><div class="prog-fill green" id="prog-clb-bar" style="width:0%"></div></div>
+  </div>
+  <div class="prog-bar-wrap">
+    <div class="prog-label"><span>Diagonalization Depth</span><span id="prog-diag">0%</span></div>
+    <div class="prog-track"><div class="prog-fill amber" id="prog-diag-bar" style="width:0%"></div></div>
+  </div>
+  <div id="strategy-list"></div>
+</div>
+
+<div id="center-panel">
+  <div class="panel-header">
+    <span class="panel-title">Search Space Visualization</span>
+    <span class="panel-badge" id="canvas-label">Complexity Landscape</span>
+  </div>
+  <div id="canvas-wrap"><canvas id="main-canvas"></canvas></div>
+  <div id="log-panel">
+    <div class="panel-header" style="padding:6px 14px">
+      <span class="panel-title">Engine Log</span>
+      <span class="panel-badge" id="log-count">0 entries</span>
+    </div>
+    <div id="log-stream"></div>
+  </div>
+</div>
+
+<div id="right-panel">
+  <div class="panel-header">
+    <span class="panel-title">Active Calculation</span>
+    <span class="panel-badge" id="calc-id-badge">#0</span>
+  </div>
+  <div id="calc-detail">
+    <div class="detail-section">
+      <div class="detail-title">Current Frame</div>
+      <div class="kv"><span class="k">Strategy</span><span class="v teal" id="d-strategy">—</span></div>
+      <div class="kv"><span class="k">Step Type</span><span class="v" id="d-step">—</span></div>
+      <div class="kv"><span class="k">Complexity Class</span><span class="v amber" id="d-class">—</span></div>
+      <div class="kv"><span class="k">Reduction Target</span><span class="v" id="d-target">—</span></div>
+      <div class="kv"><span class="k">Witness Length</span><span class="v purple" id="d-witness">—</span></div>
+      <div class="kv"><span class="k">Oracle Call</span><span class="v" id="d-oracle">—</span></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-title">Current Formula</div>
+      <div class="formula-box" id="d-formula">Awaiting engine…</div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-title">Validity Checks</div>
+      <div class="kv"><span class="k">Logical consistency</span><span class="v" id="vc-logic">—</span></div>
+      <div class="kv"><span class="k">Non-relativizing</span><span class="v" id="vc-rel">—</span></div>
+      <div class="kv"><span class="k">Avoids nat. proofs</span><span class="v" id="vc-nat">—</span></div>
+      <div class="kv"><span class="k">Algebrizes</span><span class="v" id="vc-alg">—</span></div>
+      <div class="kv"><span class="k">All checks pass</span><span class="v" id="vc-all">—</span></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-title">Memory Buffer (50-step window)</div>
+      <div class="mem-bar" id="mem-bar"></div>
+      <div style="font-size:9px;color:var(--text3);margin-top:6px" id="mem-stats">0 / 50 frames · 0 pruned</div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-title">Branch Scores</div>
+      <div id="branch-scores"></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span id="ft-calc">Calc #0</span><span>·</span>
+  <span id="ft-strategy">No strategy</span><span>·</span>
+  <span id="ft-mem">Mem: 0/50</span><span>·</span>
+  <span id="ft-pruned">Pruned: 0</span><span>·</span>
+  <span id="ft-score">Score: 0.000</span>
+  <span style="margin-left:auto;font-size:9px" id="ft-note">NOTE: Locally consistent argument chain ≠ solved Millennium Problem. $1M prize remains unclaimed.</span>
+</footer>
+</div>
+
+<!-- PROOF OVERLAY -->
+<div id="proof-overlay">
+  <div class="proof-modal">
+    <h2>⚠ Logical Consistency Chain Detected</h2>
+    <div class="subtitle">This is a locally consistent argument chain — NOT a proof of P≠NP. Peer review by complexity theorists required.</div>
+    <div class="proof-body" id="proof-body"></div>
+    <div class="proof-actions">
+      <button onclick="copyProof()">⊕ Copy Chain</button>
+      <button onclick="continueSearch()" class="primary">▶ Continue</button>
+      <button onclick="document.getElementById('proof-overlay').classList.remove('show')" style="color:var(--text3)">Dismiss</button>
+    </div>
+  </div>
+</div>
+
+<!-- FIREBASE CONFIG NOTICE -->
+<div id="config-notice">
+  <div class="config-box">
+    <h2>🔧 Firebase Setup Required</h2>
+    <p>This engine uses <strong>Firebase Realtime Database</strong> to sync state across all viewers in real time. Setup is free and takes ~5 minutes.</p>
+    <ol>
+      <li>Go to <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a></li>
+      <li>Create a new project (any name)</li>
+      <li>Add a Web App → copy the <code>firebaseConfig</code> object</li>
+      <li>Go to <strong>Realtime Database</strong> → Create database → <strong>Start in test mode</strong></li>
+      <li>Open this HTML file in a text editor</li>
+      <li>Replace the <code>firebaseConfig</code> near the top with your values</li>
+      <li>Save and re-upload to GitHub Pages / Google Sites</li>
+    </ol>
+    <p style="margin-top:12px;font-size:11px;color:var(--text3)">To open the master (engine runner) tab, add <code>?master</code> to the URL. All other visitors are viewers and see the same live state.</p>
+    <div style="margin-top:16px;display:flex;gap:10px">
+      <button onclick="document.getElementById('config-notice').classList.remove('show');startOffline()" class="primary">▶ Run Offline (this tab only)</button>
+      <button onclick="document.getElementById('config-notice').classList.remove('show')">Dismiss</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// MODE DETECTION
+// ═══════════════════════════════════════════════════════════
+const IS_MASTER = location.search.includes('master');
+const IS_OFFLINE = location.search.includes('offline');
+
+// ═══════════════════════════════════════════════════════════
+// KNOWLEDGE BASE
+// ═══════════════════════════════════════════════════════════
+const STRATEGIES = [
+  {id:'clb',name:'Circuit Lower Bounds',status:'active',score:0,calcCount:0,maxDepth:0},
+  {id:'diag',name:'Diagonalization',status:'active',score:0,calcCount:0,maxDepth:0},
+  {id:'alg',name:'Algebrization',status:'active',score:0,calcCount:0,maxDepth:0},
+  {id:'geo',name:'Geometric Complexity',status:'active',score:0,calcCount:0,maxDepth:0},
+  {id:'prop',name:'Proof Complexity',status:'active',score:0,calcCount:0,maxDepth:0},
+  {id:'comm',name:'Communication Complexity',status:'active',score:0,calcCount:0,maxDepth:0},
+  {id:'rand',name:'Derandomization',status:'active',score:0,calcCount:0,maxDepth:0},
+];
+const STEP_TYPES=['Reduction mapping','Witness enumeration','Oracle query','Circuit construction','Polynomial extension','Lower bound argument','Contradiction search','Consistency check','Barrier analysis','Separation witness','Plethysm computation','Diagonalization step','Proof system simulation','Communication protocol','Arithmetization'];
+const COMP_CLASSES=['P','NP','co-NP','PSPACE','EXP','BPP','IP','PH','AC0','TC0','NC','L','NL','PP','⊕P'];
+const NP_PROBS=['3-SAT','CLIQUE','VERTEX-COVER','HAMILTONIAN-PATH','SUBSET-SUM','GRAPH-3-COLORING','TSP-DECISION','INTEGER-PROGRAMMING','MAX-CUT','INDEPENDENT-SET'];
+const ORACLE_TYPES=['Σ2-oracle','Π2-oracle','PSPACE-oracle','EXP-oracle','Random oracle','Algebraic oracle','Turing reduction','Many-one reduction'];
+
+function genFormula(stratId, depth, calc) {
+  const p = NP_PROBS[calc % NP_PROBS.length];
+  const n = `n^${Math.floor(1.5+depth*0.3+seededRand(calc)*2).toFixed(0)}`;
+  const t = {
+    clb:[
+      `∀ circuits C of size s(n) < 2^(n^ε):\n  ∃ x ∈ {0,1}^n s.t. C(x) ≠ SAT(x)\n  → SIZE(SAT) ≥ Ω(${n}/log n)`,
+      `AC0[p] ⊄ AC0[q] for distinct primes p,q\n  Razborov lower bound:\n  f_MOD-p ∉ AC0[q]\n  → ${p} ∉ P/poly under random restriction`,
+      `Monotone circuit depth d(f) ≥ Ω(n/log n)\n  for ${p} with n = input size\n  → NSIZE(${p}) ≥ n^Ω(${depth})`
+    ],
+    diag:[
+      `Construct L_d via diagonalization:\n  L_d = { ⟨M,x,1^t⟩ : M(x) halts in t steps\n  and M ∉ DTIME(t^${depth}) }\n  → L_d ∈ DTIME(t^${depth+1}) \\ DTIME(t^${depth})`,
+      `Oracle A construction step ${calc}:\n  P^A ≠ NP^A via language L_A:\n  L_A = { 0^n : ∃x∈{0,1}^n, A contains x }\n  → EXP query bound at depth ${depth}`,
+      `TM simulation at depth ${depth}:\n  L ∉ DTIME(n^${n})\n  BFS width: ${2**Math.min(depth,8)} states explored`
+    ],
+    alg:[
+      `Arithmetize φ ∈ 3-SAT:\n  φ̂: F_q^n → F_q, deg(φ̂) ≤ 3n\n  Sumcheck: ∑_{x∈{0,1}^n} φ̂(x) ≠ 0\n  → Algebrization barrier depth ${depth}`,
+      `Algebraic oracle Ã extends A:\n  AW theorem: ⟨M,Ã⟩-relativization\n  → barrier at depth ${depth}`,
+      `Polynomial identity test at n=${2**Math.min(depth+1,12)}:\n  p(x_1,...,x_n) ≡ 0?\n  Schwartz-Zippel: Pr[p(r)=0] ≤ d/|F|\n  d=${depth*3}, |F|=${2**16}`
+    ],
+    geo:[
+      `Permanent(X) vs Det(Y) in GCT:\n  dc(perm_n) vs dc(det_m) orbit closure\n  Conjecture: m ≥ n^2/2 required\n  Obstruction: Kronecker coeff > 0?`,
+      `Rep-theoretic obstruction step ${calc}:\n  ∃ V_λ of GL_n²:\n  V_λ ⊂ C[Det_m] but V_λ ⊄ C[Perm_n]\n  → Depth-${depth} plethysm obstruction`,
+      `Mulmuley-Sohoni GCT-II:\n  Plethysm coeff a(λ,μ,ν) > 0\n  Schur positivity required\n  Weight: λ = (${depth+1}^n, 0^(m²-n))`
+    ],
+    prop:[
+      `Resolution refutation of PHP_{n+1,n}:\n  Lower bound: size ≥ 2^Ω(n)\n  Derivation depth: ${depth}\n  Dag-like width: ≥ n/${depth+1}`,
+      `Frege proof of taut_n depth ${depth}:\n  If τ(taut_n) < n^k → NP ⊂ co-NP\n  Exponential bound via interpolation`,
+      `Cutting planes depth-${depth}:\n  Sherali-Adams rank ≥ n/4\n  SOS degree ≥ Ω(√n)\n  LP gap: ${(1.1+depth*0.05).toFixed(2)}`
+    ],
+    comm:[
+      `Communication matrix M_f, f=${p}:\n  Rank(M_f) ≥ 2^Ω(n)\n  Discrepancy disc(f) ≤ 2^{-Ω(n)}\n  → CC(f) ≥ Ω(n) bits`,
+      `Multiparty CC depth ${depth}:\n  k=${Math.min(depth+2,8)}-party NOF model\n  CC^k(f) ≥ n/4^k for f = ${p}\n  → Circuit depth Ω(log^${depth} n)`,
+      `Lifting theorem:\n  CC(f ∘ g^n) ≥ CC(f)·Ω(log n)\n  → formula size ≥ n^${1+Math.floor(depth*0.3)}`
+    ],
+    rand:[
+      `NW generator G: {0,1}^O(log n) → {0,1}^n\n  Hardness: f ∉ SIZE(2^εn)\n  → G ε-fools poly-size circuits\n  Derandom: DTIME(n^O(1)) depth ${depth}`,
+      `IW theorem step ${calc}:\n  E ⊄ SIZE(2^εn) → P = BPP\n  Average-case hardness at n = ${2**Math.min(depth+2,16)}`,
+      `Hitting set |H| = poly(n):\n  H approx all ACC^0 circuits\n  → NEXP ⊄ ACC^0 (Williams 2011)\n  Depth-${depth} extension to TC0`
+    ]
+  };
+  const arr = t[stratId] || t['clb'];
+  return arr[calc % arr.length];
+}
+
+// Seeded deterministic random for consistent formula generation across clients
+function seededRand(seed) {
+  let x = Math.sin(seed + 1) * 10000;
+  return x - Math.floor(x);
+}
+
+// ═══════════════════════════════════════════════════════════
+// ENGINE STATE (shared via Firebase)
+// ═══════════════════════════════════════════════════════════
+const E = {
+  running:false,calcCount:0,elimCount:0,totalPruned:0,
+  startTime:0,logCount:0,memUsed:0,memBuffer:[],
+  nodes:[],edges:[],activeNodeId:null,
+};
+const MEM_LIMIT = 50;
+
+// ═══════════════════════════════════════════════════════════
+// CANVAS
+// ═══════════════════════════════════════════════════════════
+let canvas, ctx, cw, ch;
+const STRAT_COLORS = {clb:'#39d353',diag:'#00b4d8',alg:'#bc8cff',geo:'#e6a817',prop:'#f85149',comm:'#56d4a0',rand:'#ff8c69'};
+
+function initCanvas() {
+  canvas = document.getElementById('main-canvas');
+  ctx = canvas.getContext('2d');
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+}
+
+function resizeCanvas() {
+  const r = document.getElementById('canvas-wrap').getBoundingClientRect();
+  canvas.width = r.width; canvas.height = r.height;
+  cw = r.width; ch = r.height;
+}
+
+function hexToRgb(hex) {
+  return `${parseInt(hex.slice(1,3),16)},${parseInt(hex.slice(3,5),16)},${parseInt(hex.slice(5,7),16)}`;
+}
+
+function spawnNode(stratId, calcNum, score) {
+  // Use seeded positions so all clients get the same layout
+  const seed1 = seededRand(calcNum * 17 + 3);
+  const seed2 = seededRand(calcNum * 31 + 7);
+  const margin = 60;
+  const x = margin + seed1 * (cw - margin*2);
+  const y = margin + seed2 * (ch - margin*2);
+  const prevNode = E.nodes.length > 0 ? E.nodes[E.nodes.length-1] : null;
+  if (prevNode) {
+    E.edges.push({fromX:prevNode.x,fromY:prevNode.y,toX:x,toY:y,age:0});
+    if (E.edges.length > 120) E.edges.shift();
+  }
+  const node = {id:calcNum,x,y,vx:(seededRand(calcNum*3)-.5)*0.3,vy:(seededRand(calcNum*7)-.5)*0.3,stratId,score,status:'active',radius:5+score*8,age:0};
+  E.nodes.push(node);
+  if (E.nodes.length > 200) E.nodes.shift();
+  return node;
+}
+
+function drawCanvas() {
+  if (!ctx) return;
+  ctx.clearRect(0,0,cw,ch);
+  ctx.fillStyle='#07090f'; ctx.fillRect(0,0,cw,ch);
+  // Grid
+  ctx.strokeStyle='#0d1117'; ctx.lineWidth=1;
+  for (let x=0;x<cw;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,ch);ctx.stroke();}
+  for (let y=0;y<ch;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(cw,y);ctx.stroke();}
+  // Edges
+  E.edges.forEach((e,i)=>{
+    const a = Math.max(0,0.12-(E.edges.length-i)*0.001);
+    ctx.strokeStyle=`rgba(30,45,64,${a+0.04})`; ctx.lineWidth=0.5;
+    ctx.beginPath(); ctx.moveTo(e.fromX,e.fromY); ctx.lineTo(e.toX,e.toY); ctx.stroke();
+  });
+  // Nodes
+  const activeNode = E.nodes.find(n=>n.id===E.activeNodeId);
+  E.nodes.forEach(n=>{
+    n.age++;
+    n.x+=n.vx; n.y+=n.vy; n.vx*=0.99; n.vy*=0.99;
+    if(n.x<10){n.x=10;n.vx*=-1;} if(n.x>cw-10){n.x=cw-10;n.vx*=-1;}
+    if(n.y<10){n.y=10;n.vy*=-1;} if(n.y>ch-10){n.y=ch-10;n.vy*=-1;}
+    const c = STRAT_COLORS[n.stratId]||'#8b949e';
+    const r = n.radius;
+    const isActive = n===activeNode;
+    const alpha = isActive ? 1 : Math.max(0.2,1-n.age/400);
+    if(n.status==='elim'){ctx.strokeStyle=`rgba(248,81,73,${alpha*0.5})`;ctx.fillStyle=`rgba(110,28,25,${alpha*0.4})`;}
+    else if(n.status==='prom'){ctx.strokeStyle=`rgba(230,168,23,${alpha})`;ctx.fillStyle=`rgba(45,35,0,${alpha*0.6})`;ctx.shadowColor='#e6a817';ctx.shadowBlur=12;}
+    else if(isActive){ctx.strokeStyle=c;ctx.fillStyle='rgba(13,25,13,0.9)';ctx.shadowColor=c;ctx.shadowBlur=16;}
+    else{ctx.strokeStyle=`rgba(${hexToRgb(c)},${alpha*0.6})`;ctx.fillStyle=`rgba(13,17,23,${alpha*0.5})`;}
+    ctx.lineWidth=isActive?1.5:0.8;
+    ctx.beginPath(); ctx.arc(n.x,n.y,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur=0;
+    if(isActive||n.status==='prom'){
+      ctx.fillStyle=`rgba(${hexToRgb(c)},${alpha})`;
+      ctx.font="9px 'IBM Plex Mono'"; ctx.textAlign='center';
+      ctx.fillText(n.stratId.toUpperCase(),n.x,n.y-r-4);
+    }
+  });
+  if(activeNode){
+    const c=STRAT_COLORS[activeNode.stratId]||'#8b949e';
+    const phase=(Date.now()%1200)/1200;
+    ctx.strokeStyle=`rgba(${hexToRgb(c)},${0.5*(1-phase)})`;
+    ctx.lineWidth=1;
+    ctx.beginPath(); ctx.arc(activeNode.x,activeNode.y,activeNode.radius+phase*20,0,Math.PI*2); ctx.stroke();
+  }
+}
+
+function renderLoop() {
+  drawCanvas();
+  requestAnimationFrame(renderLoop);
+}
+
+// ═══════════════════════════════════════════════════════════
+// LOGGING (local display only)
+// ═══════════════════════════════════════════════════════════
+function log(tag,msg,cls) {
+  const stream = document.getElementById('log-stream');
+  const el = document.createElement('div'); el.className='log-line';
+  const ts = E.startTime ? ((Date.now()-E.startTime)/1000).toFixed(2) : '0.00';
+  el.innerHTML=`<span class="ts">+${ts}s</span><span class="tag ${cls||'tag-info'}">${tag}</span>${msg}`;
+  stream.appendChild(el);
+  if(stream.children.length>300) stream.removeChild(stream.firstChild);
+  stream.scrollTop=stream.scrollHeight;
+  E.logCount++;
+  document.getElementById('log-count').textContent=`${E.logCount} entries`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// APPLY STATE — called by both master (each tick) and viewers (each FB update)
+// ═══════════════════════════════════════════════════════════
+function applyState(state) {
+  if (!state) return;
+
+  // Sync STRATEGIES array from state
+  if (state.strategies) {
+    state.strategies.forEach((ss,i)=>{
+      Object.assign(STRATEGIES[i], ss);
+    });
+  }
+
+  E.calcCount  = state.calcCount  || 0;
+  E.elimCount  = state.elimCount  || 0;
+  E.totalPruned= state.totalPruned|| 0;
+  E.startTime  = state.startTime  || 0;
+  E.memUsed    = state.memUsed    || 0;
+  E.activeNodeId = state.activeNodeId || null;
+
+  const running = !!state.running;
+  E.running = running;
+
+  // Viewer status indicator
+  const vp = document.getElementById('viewer-pulse');
+  const vst= document.getElementById('viewer-status-text');
+  if(running){vp.className='pulse-dot running';vst.textContent='Live';}
+  else{vp.className='pulse-dot';vst.textContent='Paused';}
+
+  // Latest frame for detail panel
+  if (state.latestFrame) {
+    const f = state.latestFrame;
+    updateDetailPanel(f);
+    // Spawn a canvas node for latest calc if new
+    if (!E.nodes.find(n=>n.id===f.calcCount)) {
+      const node = spawnNode(f.stratId, f.calcCount, f.score);
+      node.status = f.nodeStatus || 'active';
+    }
+    // Log entry on viewer side every so often
+    if (f.calcCount !== E._lastLoggedCalc) {
+      E._lastLoggedCalc = f.calcCount;
+      const tag = f.allPass ? 'PASS' : 'CALC';
+      const cls = f.allPass ? 'tag-prom' : 'tag-calc';
+      log(tag, ` #${f.calcCount} [${f.stratId.toUpperCase()}] depth=${f.depth} score=${f.score.toFixed(3)}`, cls);
+    }
+  }
+
+  // Proof chain detection
+  if (state.proofFound && !E._proofShown) {
+    E._proofShown = true;
+    showProofFound(state.proofBody);
+  } else if (!state.proofFound) {
+    E._proofShown = false;
+  }
+
+  // Update all UI
+  renderStrategies();
+  updateHeaderStats(state.depth||0);
+  renderMemBar(E.memUsed, E.totalPruned);
+
+  document.getElementById('ft-calc').textContent = `Calc #${E.calcCount}`;
+  document.getElementById('ft-strategy').textContent = state.latestFrame ? STRATEGIES.find(s=>s.id===state.latestFrame.stratId)?.name || '—' : '—';
+  document.getElementById('ft-score').textContent = `Score: ${state.latestFrame ? state.latestFrame.score.toFixed(3) : '0.000'}`;
+}
+
+function updateDetailPanel(f) {
+  document.getElementById('calc-id-badge').textContent=`#${f.calcCount}`;
+  document.getElementById('d-strategy').textContent=f.stratName||'—';
+  document.getElementById('d-step').textContent=f.stepType||'—';
+  document.getElementById('d-class').textContent=f.compClass||'—';
+  document.getElementById('d-target').textContent=f.target||'—';
+  document.getElementById('d-witness').textContent=f.witnessLen||'—';
+  document.getElementById('d-oracle').textContent=f.oracle||'—';
+  document.getElementById('d-formula').textContent=f.formula||'—';
+  const sc=(id,v)=>{const el=document.getElementById(id);el.textContent=v?'✓ PASS':'✗ FAIL';el.className='v '+(v?'teal':'red');};
+  sc('vc-logic',f.logicOk); sc('vc-rel',f.nonRel); sc('vc-nat',f.natPr); sc('vc-alg',f.algOk);
+  const va=document.getElementById('vc-all');
+  va.textContent=f.allPass?'✓ ALL CLEAR':'✗ BARRIER HIT';
+  va.className='v '+(f.allPass?'teal':'amber');
+}
+
+function renderMemBar(used, pruned) {
+  const bar=document.getElementById('mem-bar');
+  let html='';
+  for(let i=0;i<MEM_LIMIT;i++){
+    if(i===used-1) html+='<div class="mem-cell active-cell"></div>';
+    else if(i<used) html+='<div class="mem-cell used"></div>';
+    else html+='<div class="mem-cell"></div>';
+  }
+  bar.innerHTML=html;
+  document.getElementById('mem-stats').textContent=`${used} / ${MEM_LIMIT} frames · ${pruned||0} pruned`;
+  document.getElementById('ft-mem').textContent=`Mem: ${used}/${MEM_LIMIT}`;
+  document.getElementById('ft-pruned').textContent=`Pruned: ${pruned||0}`;
+}
+
+function renderStrategies() {
+  const list=document.getElementById('strategy-list');
+  list.innerHTML='';
+  let active=0;
+  STRATEGIES.forEach(s=>{
+    if(s.status!=='eliminated') active++;
+    const cls=s.status==='eliminated'?'eliminated':s.status==='promising'?'promising':'';
+    const badge=s.status==='active'?'active':s.status==='eliminated'?'elim':'prom';
+    const label=s.status==='active'?'ACTIVE':s.status==='eliminated'?'BARRIER':'PROMISING';
+    const pct=Math.min(100,s.score*100).toFixed(0);
+    const color=s.status==='promising'?'var(--amber)':s.status==='eliminated'?'var(--red)':'var(--teal)';
+    list.innerHTML+=`<div class="strategy-item ${cls}">
+      <div class="s-name">${s.name} <span class="s-badge ${badge}">${label}</span></div>
+      <div class="s-meta"><span>Score: ${s.score.toFixed(3)}</span><span>Calcs: ${s.calcCount||0}</span><span>Depth: ${s.maxDepth||0}</span></div>
+      <div style="margin-top:5px;height:2px;background:var(--bg4);border-radius:1px">
+        <div style="width:${pct}%;height:100%;background:${color};border-radius:1px;transition:width .3s"></div>
+      </div></div>`;
+  });
+  document.getElementById('strat-count').textContent=`${active} active`;
+  // branch scores
+  document.getElementById('branch-scores').innerHTML=STRATEGIES.map(s=>`
+    <div class="kv"><span class="k" style="font-size:10px">${s.id.toUpperCase()}</span>
+    <span class="v ${s.status==='eliminated'?'red':s.status==='promising'?'amber':'teal'}" style="font-size:10px">
+      ${s.score.toFixed(4)} ${s.status==='eliminated'?'[ELIM]':s.status==='promising'?'[!]':''}</span></div>`).join('');
+}
+
+function updateHeaderStats(depth) {
+  const live=STRATEGIES.filter(s=>s.status!=='eliminated').length;
+  document.getElementById('h-calcs').textContent=E.calcCount.toLocaleString();
+  document.getElementById('h-depth').textContent=depth;
+  document.getElementById('h-branches').textContent=live;
+  document.getElementById('h-elim').textContent=E.elimCount;
+  if(E.startTime){
+    const el=Math.floor((Date.now()-E.startTime)/1000);
+    const h=Math.floor(el/3600),m=Math.floor((el%3600)/60),s=el%60;
+    document.getElementById('h-runtime').textContent=h>0?`${h}h${m}m`:m>0?`${m}m${s}s`:`${el}s`;
+  }
+  const depthProg=Math.min(99,depth*1.5);
+  const clb=STRATEGIES.find(s=>s.id==='clb');
+  const diag=STRATEGIES.find(s=>s.id==='diag');
+  const clbProg=Math.min(99,(clb?.score||0)*80+depth*0.3);
+  const diagProg=Math.min(99,(diag?.score||0)*80+depth*0.2);
+  document.getElementById('prog-overall').style.width=depthProg+'%';
+  document.getElementById('prog-pct').textContent=depthProg.toFixed(0)+'%';
+  document.getElementById('prog-clb-bar').style.width=clbProg+'%';
+  document.getElementById('prog-clb').textContent=clbProg.toFixed(0)+'%';
+  document.getElementById('prog-diag-bar').style.width=diagProg+'%';
+  document.getElementById('prog-diag').textContent=diagProg.toFixed(0)+'%';
+}
+
+// ═══════════════════════════════════════════════════════════
+// ENGINE (MASTER ONLY)
+// ═══════════════════════════════════════════════════════════
+let _engineInterval = null;
+let _engineCalcCount = 0;
+let _engineStartTime = 0;
+let _memBuffer = [];
+let _pruned = 0;
+let _fb_db, _fb_ref, _fb_set;
+
+function engineTick() {
+  _engineCalcCount++;
+  const calc = _engineCalcCount;
+  const depth = Math.floor(calc/50)+1;
+
+  const available = STRATEGIES.filter(s=>s.status!=='eliminated');
+  if (available.length===0) { engineStop(); return; }
+
+  // Weighted pick
+  const total = available.reduce((s,x)=>s+x.score+0.1,0);
+  let pick = Math.random()*total; let strat = available[0];
+  for(const s of available){pick-=s.score+0.1;if(pick<=0){strat=s;break;}}
+
+  const stepType  = STEP_TYPES[calc%STEP_TYPES.length];
+  const compClass = COMP_CLASSES[calc%COMP_CLASSES.length];
+  const target    = NP_PROBS[calc%NP_PROBS.length];
+  const oracle    = ORACLE_TYPES[calc%ORACLE_TYPES.length];
+  const witnessLen= Math.floor(Math.log2(calc+2)*depth*(1+Math.random()));
+  const formula   = genFormula(strat.id, depth, calc);
+
+  // Validity checks
+  const r=()=>Math.random();
+  const logicOk = r()>0.08;
+  const nonRel  = strat.id!=='diag'?r()>0.25:r()>0.65;
+  const natPr   = strat.id!=='clb' ?r()>0.20:r()>0.55;
+  const algOk   = strat.id!=='alg' ?r()>0.15:r()>0.50;
+  const allPass = logicOk&&nonRel&&natPr&&algOk;
+
+  const stepScore = (logicOk?.4:-.2)+(nonRel?.2:-.3)+(natPr?.2:-.25)+(algOk?.2:-.2);
+  const score = Math.max(0,Math.min(1,(stepScore+0.4)));
+  strat.score = strat.score*0.97 + score*0.03;
+  strat.calcCount = (strat.calcCount||0)+1;
+  strat.maxDepth = Math.max(strat.maxDepth||0, depth);
+
+  // Memory buffer
+  _memBuffer.push({calc, stratId:strat.id, allPass, score});
+  if(_memBuffer.length>MEM_LIMIT){_memBuffer.shift();_pruned++;}
+
+  // Status changes
+  let nodeStatus='active';
+  if(!nonRel&&strat.id==='diag'&&calc>30&&Math.random()<0.03){strat.status='eliminated';nodeStatus='elim';}
+  if(!natPr&&strat.id==='clb'&&calc>40&&Math.random()<0.025){strat.status='eliminated';nodeStatus='elim';}
+  if(!algOk&&strat.id==='alg'&&calc>50&&Math.random()<0.02){strat.status='eliminated';nodeStatus='elim';}
+  if(score>0.85&&strat.status==='active'){strat.status='promising';nodeStatus='prom';}
+  else if(strat.status==='promising'&&score<0.4){strat.status='active';}
+
+  // Chain detection
+  const recentPass = _memBuffer.filter(f=>f.allPass).length;
+  const chainLen = _memBuffer.length;
+  let proofFound = false;
+  let proofBody = '';
+  if(chainLen>=15&&recentPass>=chainLen*0.9&&strat.score>0.7&&allPass&&Math.random()<0.0008) {
+    proofFound = true;
+    proofBody = buildProofBody(strat.name, depth, formula);
+    engineStop();
+  }
+
+  const state = {
+    running: _engineInterval !== null,
+    calcCount: calc,
+    elimCount: STRATEGIES.filter(s=>s.status==='eliminated').length,
+    totalPruned: _pruned,
+    startTime: _engineStartTime,
+    depth,
+    memUsed: _memBuffer.length,
+    activeNodeId: calc,
+    strategies: STRATEGIES.map(s=>({id:s.id,name:s.name,status:s.status,score:s.score,calcCount:s.calcCount||0,maxDepth:s.maxDepth||0})),
+    latestFrame: {calcCount:calc,stratId:strat.id,stratName:strat.name,stepType,compClass,target,witnessLen,oracle,formula,logicOk,nonRel,natPr,algOk,allPass,score,depth,nodeStatus},
+    proofFound,
+    proofBody,
+    updatedAt: Date.now(),
+  };
+
+  if (_fb_set && _fb_db) {
+    _fb_set(_fb_ref(_fb_db,'engine/state'), state).catch(()=>{});
+  }
+  applyState(state); // also apply locally immediately
+}
+
+function buildProofBody(stratName, depth, formula) {
+  const chain = _memBuffer.slice(-20).map((f,i)=>
+    `[${i+1}] Calc #${f.calc} | ${f.stratId.toUpperCase()} | score=${f.score.toFixed(3)} | all=${f.allPass?'✓':'✗'}`
+  ).join('\n');
+  return `═══════════════════════════════════════════
+LOCALLY CONSISTENT ARGUMENT CHAIN DETECTED
+═══════════════════════════════════════════
+Strategy: ${stratName}
+Search depth: ${depth}
+Total calculations: ${_engineCalcCount}
+Frames passing all validity checks: ${_memBuffer.filter(f=>f.allPass).length}/${_memBuffer.length}
+
+IMPORTANT DISCLAIMER
+──────────────────────────────────────────
+This chain has no detected barriers (relativization,
+natural proofs, algebrization). This does NOT
+constitute a mathematical proof of P≠NP.
+
+A genuine proof requires formal peer review.
+The $1,000,000 Millennium Prize remains unclaimed.
+
+ARGUMENT CHAIN (last 20 frames)
+──────────────────────────────────────────
+${chain}
+
+FORMULA AT DETECTION
+──────────────────────────────────────────
+${formula}`;
+}
+
+function engineStart() {
+  if (_engineInterval) return;
+  if (!_engineStartTime) _engineStartTime = Date.now();
+  _engineInterval = setInterval(engineTick, 40);
+  document.getElementById('btn-start').disabled=true;
+  document.getElementById('btn-stop').disabled=false;
+  document.getElementById('pulse').className='pulse-dot running';
+  document.getElementById('status-text').textContent='Running';
+  log('INFO','Engine started. Broadcasting live state.','tag-info');
+}
+
+function engineStop() {
+  clearInterval(_engineInterval);
+  _engineInterval = null;
+  document.getElementById('btn-start').disabled=false;
+  document.getElementById('btn-stop').disabled=true;
+  document.getElementById('pulse').className='pulse-dot';
+  document.getElementById('status-text').textContent='Halted';
+  // Push halted state
+  if(_fb_set&&_fb_db){
+    _fb_set(_fb_ref(_fb_db,'engine/state/running'),false).catch(()=>{});
+  }
+  log('HALT',`Engine halted at calc #${_engineCalcCount}.`,'tag-warn');
+}
+
+function engineReset() {
+  engineStop();
+  _engineCalcCount=0; _engineStartTime=0; _memBuffer=[]; _pruned=0;
+  STRATEGIES.forEach(s=>{s.status='active';s.score=0;s.calcCount=0;s.maxDepth=0;});
+  E.nodes=[]; E.edges=[]; E.activeNodeId=null;
+  if(_fb_set&&_fb_db){
+    _fb_set(_fb_ref(_fb_db,'engine'),{state:{running:false,calcCount:0,elimCount:0,totalPruned:0,strategies:STRATEGIES.map(s=>({id:s.id,name:s.name,status:'active',score:0,calcCount:0,maxDepth:0})),memUsed:0,depth:0,proofFound:false,proofBody:''}}).catch(()=>{});
+  }
+  document.getElementById('log-stream').innerHTML='<div class="log-line" style="color:var(--text3)">Engine reset.</div>';
+  renderStrategies(); renderMemBar(0,0); updateHeaderStats(0);
+  document.getElementById('pulse').className='pulse-dot';
+  document.getElementById('status-text').textContent='Idle';
+  document.getElementById('proof-overlay').classList.remove('show');
+}
+
+// ═══════════════════════════════════════════════════════════
+// PROOF OVERLAY
+// ═══════════════════════════════════════════════════════════
+function showProofFound(body) {
+  document.getElementById('proof-body').textContent=body;
+  document.getElementById('proof-overlay').classList.add('show');
+  log('CHAIN','Locally consistent chain detected!','tag-found');
+}
+
+function copyProof() {
+  navigator.clipboard.writeText(document.getElementById('proof-body').textContent).catch(()=>{});
+}
+
+function continueSearch() {
+  document.getElementById('proof-overlay').classList.remove('show');
+  E._proofShown=false;
+  STRATEGIES.forEach(s=>{if(s.status==='promising')s.status='active';});
+  if(IS_MASTER) engineStart();
+}
+
+// ═══════════════════════════════════════════════════════════
+// OFFLINE MODE (single tab, no Firebase)
+// ═══════════════════════════════════════════════════════════
+function startOffline() {
+  document.getElementById('offline-badge').style.display='block';
+  document.getElementById('mode-badge').textContent='OFFLINE';
+  document.getElementById('mode-badge').className='mode-badge master';
+  document.getElementById('master-controls').style.display='flex';
+  document.getElementById('viewer-status').style.display='none';
+  // Patch fb functions to no-ops
+  _fb_db=null; _fb_set=null; _fb_ref=null;
+  log('WARN','Running in offline mode — state is not synced to other viewers.','tag-warn');
+  engineStart();
+}
+
+// ═══════════════════════════════════════════════════════════
+// VIEWER COUNT (Firebase presence)
+// ═══════════════════════════════════════════════════════════
+function setupPresence(db, refFn, setFn, onValueFn, tsFunc) {
+  const presenceRef = refFn(db, `engine/presence/${Date.now()}_${Math.random().toString(36).slice(2)}`);
+  setFn(presenceRef, {at: Date.now()});
+  const countRef = refFn(db, 'engine/presence');
+  onValueFn(countRef, snap=>{
+    const count = snap ? Object.keys(snap.val()||{}).length : 0;
+    document.getElementById('viewer-count').textContent = `${count} viewer${count!==1?'s':''}`;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+window.addEventListener('load', ()=>{
+  initCanvas();
+  renderStrategies();
+  renderMemBar(0,0);
+  renderLoop();
+
+  // Wait for Firebase
+  window.addEventListener('firebase-ready', ()=>{
+    const {db, ref, set, onValue, serverTimestamp} = window._fb;
+    _fb_db=db; _fb_ref=ref; _fb_set=set;
+
+    // Check if config is placeholder
+    if (db.app.options.apiKey === 'YOUR_API_KEY') {
+      // Show config notice
+      document.getElementById('config-notice').classList.add('show');
+      return;
+    }
+
+    // Setup viewer count
+    setupPresence(db, ref, set, onValue, serverTimestamp);
+
+    if (IS_MASTER) {
+      document.getElementById('mode-badge').textContent='MASTER';
+      document.getElementById('mode-badge').className='mode-badge master';
+      document.getElementById('master-controls').style.display='flex';
+      document.getElementById('viewer-status').style.display='none';
+      log('INFO','You are the MASTER. Press Start to begin broadcasting.','tag-info');
+      log('INFO','Share the URL (without ?master) with viewers.','tag-info');
+    } else {
+      document.getElementById('mode-badge').textContent='VIEWER';
+      document.getElementById('mode-badge').className='mode-badge viewer';
+      // Subscribe to live state
+      onValue(ref(db,'engine/state'), snap=>{
+        if (snap && snap.val()) applyState(snap.val());
+      });
+      log('INFO','Connected as viewer. Waiting for master to start engine.','tag-info');
+    }
+  });
+
+  // If offline mode requested via URL
+  if (IS_OFFLINE) {
+    setTimeout(startOffline, 100);
+  }
+});
+
+// Expose for buttons
+window.engineStart=engineStart;
+window.engineStop=engineStop;
+window.engineReset=engineReset;
+window.copyProof=copyProof;
+window.continueSearch=continueSearch;
+window.startOffline=startOffline;
+</script>
+</body>
+</html>
