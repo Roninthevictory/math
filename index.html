@@ -878,13 +878,6 @@ window.addEventListener('load', ()=>{
     const {db, ref, set, onValue, serverTimestamp} = window._fb;
     _fb_db=db; _fb_ref=ref; _fb_set=set;
 
-    // Check if config is placeholder
-    if (db.app.options.apiKey === 'YOUR_API_KEY') {
-      // Show config notice
-      document.getElementById('config-notice').classList.add('show');
-      return;
-    }
-
     // Setup viewer count
     setupPresence(db, ref, set, onValue, serverTimestamp);
 
